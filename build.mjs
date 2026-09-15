@@ -34,6 +34,24 @@ replaceRequired(
 );
 
 replaceRequired(
+  '(0,C.jsx)(Pb,{language:a}),(0,C.jsx)("a",{className:"download-html-button",href:"/downloads/Kazhutha.html",download:"Kazhutha.html",children:"Download HTML \\u2193"})',
+  "null",
+  "the Install app and Download HTML menu options",
+);
+
+replaceRequired(
+  "Friends sign in with ChatGPT to use online rooms. The game is free of real-money betting.",
+  "The game is free of real-money betting.",
+  "the sign-in note in the install information",
+);
+
+replaceRequired(
+  "Each friend opens the invite link on their own device, enters a name, and joins. Friends sign in with ChatGPT, then join using your room code.",
+  "Each friend opens the invite link on their own device, enters a name, and joins.",
+  "the ChatGPT sign-in sentence in the room lobby",
+);
+
+replaceRequired(
   '}var k2=pe(Pt(),1);(0,F2.createRoot)(document.getElementById("root")).render((0,k2.jsx)(Ub,{standalone:!0}));})();',
   '}var KazhuthaRoomClient=window.KazhuthaMultiplayer.createClient({create:R2,play:Tb,resolve:I2,view:Eb,legal:ah,classic:Lc,trump:wb,ai:Rx},D2);var k2=pe(Pt(),1);(0,F2.createRoot)(document.getElementById("root")).render((0,k2.jsx)(Ub,{standalone:!1}));})();',
   "the standalone application startup",

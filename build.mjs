@@ -18,6 +18,22 @@ function replaceRequired(search, replacement, description) {
   html = html.replace(search, replacement);
 }
 
+function replaceAllRequired(search, replacement, expected, description) {
+  const occurrences = html.split(search).length - 1;
+  if (occurrences !== expected) throw new Error(`Could not prepare the hosted build: expected ${expected} ${description}, found ${occurrences}.`);
+  html = html.split(search).join(replacement);
+}
+
+// Seats belong to browser tabs. Shared localStorage made an invite opened in a
+// second tab reuse the host token and attempt to claim the host seat remotely.
+replaceAllRequired('xl.get("kazhutha-room")', 'KazhuthaRoomStorage.get()', 2, 'saved-room reads');
+replaceAllRequired('xl.set("kazhutha-room",JSON.stringify(He))', 'KazhuthaRoomStorage.set(JSON.stringify(He))', 1, 'saved-room writes');
+replaceRequired(
+  'Me?.code===Ge.trim().toUpperCase()?{token:Me.token}:{}',
+  'Me?.code===Ge.trim().toUpperCase()&&Me.seat>0?{token:Me.token}:{}',
+  'guest-only seat restoration',
+);
+
 replaceRequired(
   "<title>Kazhutha · കഴുത — Downloaded edition</title>",
   "<title>Kazhutha · കഴുത</title>",
@@ -62,7 +78,7 @@ replaceRequired(
 
 replaceRequired(
   '}var k2=pe(Pt(),1);(0,F2.createRoot)(document.getElementById("root")).render((0,k2.jsx)(Ub,{standalone:!0}));})();',
-  '}var KazhuthaRoomClient=window.KazhuthaMultiplayer.createClient({create:R2,play:Tb,resolve:I2,view:Eb,legal:ah,classic:Lc,trump:wb,ai:Rx},D2);var k2=pe(Pt(),1);(0,F2.createRoot)(document.getElementById("root")).render((0,k2.jsx)(Ub,{standalone:!1}));})();',
+  '}var KazhuthaRoomStorage={get:()=>{try{return sessionStorage.getItem("kazhutha-room")}catch{return null}},set:value=>{try{sessionStorage.setItem("kazhutha-room",value)}catch{}}};var KazhuthaRoomClient=window.KazhuthaMultiplayer.createClient({create:R2,play:Tb,resolve:I2,view:Eb,legal:ah,classic:Lc,trump:wb,ai:Rx},D2);var k2=pe(Pt(),1);(0,F2.createRoot)(document.getElementById("root")).render((0,k2.jsx)(Ub,{standalone:!1}));})();',
   "the standalone application startup",
 );
 

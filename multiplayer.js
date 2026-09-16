@@ -240,7 +240,15 @@
         await ensureServer();
         if (socket) { socket.close(); socket = null; connectionPromise = null; }
         await connectGuest(payload.code);
-        return rpc(payload);
+        try { return await rpc(payload); }
+        catch (error) {
+          // Older builds stored a host token in shared localStorage. An invite
+          // opened in another tab must get its own guest seat instead.
+          if (payload.token && error.status === 403 && error.message === 'The host seat cannot be joined remotely.') {
+            return rpc({ ...payload, token: undefined });
+          }
+          throw error;
+        }
       }
       await connectGuest(payload.code, payload.token);
       return rpc(payload);

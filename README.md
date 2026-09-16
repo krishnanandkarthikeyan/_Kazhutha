@@ -39,6 +39,7 @@ The built `index.html`, `multiplayer.js` source, and `server.js` are all at the 
 
 - The host creates a private room and shares the `KZH-XXXXXX` code or invite link.
 - The host's browser owns the live game, so the host must keep the game page open.
+- Each tab keeps its own room seat; opening an invite link in another tab creates a guest seat instead of reusing the host seat. After deploying an update, refresh open game tabs and create a new room.
 - Players need internet access. By default, the room connection is served at the same address as the website.
 - A deployment or service restart closes current rooms. Create a new room afterward.
 - AI, local multiplayer, practice, and browser-saved statistics continue to work.

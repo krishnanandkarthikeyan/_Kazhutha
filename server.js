@@ -9,7 +9,7 @@ const files = new Map([
   ['/multiplayer.js', ['multiplayer.js', 'text/javascript; charset=utf-8']],
 ]);
 const assets = new Map(await Promise.all([...new Set([...files.values()].map(x => x[0]))].map(async name =>
-  [name, await readFile(new URL(`./dist/${name}`, import.meta.url))]
+  [name, await readFile(new URL(`./${name}`, import.meta.url))]
 )));
 const rooms = new Map();
 const codePattern = /^KZH-[A-F0-9]{6}$/;

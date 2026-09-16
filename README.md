@@ -4,7 +4,7 @@ This package builds the original Kazhutha game page for Render. Its private room
 
 ## Deploy
 
-1. Put every file in this folder in the root of a GitHub repository.
+1. Put every file in this folder in the root of a GitHub repository. Delete the old `dist` folder from the repository if it is still there.
 2. In Render, choose **New > Blueprint**.
 3. Connect the repository. Render detects `render.yaml` and creates the **Web Service** called `kazhutha-online`. Confirm that the Render service type says **Web Service**, with `npm run build` as the build command and `npm start` as the start command.
 4. After the deploy finishes, open the generated `onrender.com` URL.
@@ -25,7 +25,9 @@ npm run build
 npm start
 ```
 
-Then open <http://localhost:8000>.
+Then open <http://localhost:3000>.
+
+The built `index.html`, `multiplayer.js`, and `server.js` are all at the project root. Keep `render.yaml`, `package.json`, `build.mjs`, and `Kazhutha.html` there too.
 
 ## Multiplayer notes
 

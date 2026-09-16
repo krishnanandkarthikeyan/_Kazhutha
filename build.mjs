@@ -1,10 +1,7 @@
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 
 const sourcePath = new URL("./Kazhutha.html", import.meta.url);
-const clientPath = new URL("./multiplayer.js", import.meta.url);
-const outputDir = new URL("./dist/", import.meta.url);
-const outputHtml = new URL("./dist/index.html", import.meta.url);
-const outputClient = new URL("./dist/multiplayer.js", import.meta.url);
+const outputHtml = new URL("./index.html", import.meta.url);
 
 let html = await readFile(sourcePath, "utf8");
 
@@ -63,10 +60,6 @@ replaceRequired(
   "the standalone application startup",
 );
 
-await mkdir(outputDir, { recursive: true });
-await Promise.all([
-  writeFile(outputHtml, html),
-  copyFile(clientPath, outputClient),
-]);
+await writeFile(outputHtml, html);
 
-console.log("Kazhutha hosted build created in dist/");
+console.log("Kazhutha hosted build created as index.html");

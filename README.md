@@ -6,11 +6,13 @@ This package builds the original Kazhutha game page for Render. Its private room
 
 1. Put every file in this folder in the root of a GitHub repository.
 2. In Render, choose **New > Blueprint**.
-3. Connect the repository. Render detects `render.yaml` and creates the web service.
+3. Connect the repository. Render detects `render.yaml` and creates the **Web Service** called `kazhutha-online`. Confirm that the Render service type says **Web Service**, with `npm run build` as the build command and `npm start` as the start command.
 4. After the deploy finishes, open the generated `onrender.com` URL.
 
-If you previously deployed the static version, this Blueprint creates a separate
-web service called `kazhutha-online`. Share its new URL for online rooms.
+If you previously deployed `kazhutha-game.onrender.com` as a Static Site, it will
+continue to show the game but cannot run private rooms. Pushing new files to
+that Static Site does not change its service type. Use the new Web Service URL
+for both the host and every guest. Open `/health` on that URL: it must say `ok`.
 
 No environment variables or external multiplayer service are required.
 

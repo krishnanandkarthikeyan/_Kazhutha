@@ -115,6 +115,20 @@
     const pending = new Map();
     const clientTokens = new Map();
     const endpoint = () => `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`;
+    let serviceCheck = null;
+
+    async function ensureServer() {
+      if (!serviceCheck) serviceCheck = (async () => {
+        let response;
+        try { response = await fetch('/health', { cache: 'no-store' }); }
+        catch { throw fail('No multiplayer server is running at this website. Open the Render Web Service URL, not the old Static Site URL.'); }
+        if (!response.ok || (await response.text()).trim() !== 'ok') {
+          throw fail('No multiplayer server is running at this website. Open the Render Web Service URL, not the old Static Site URL.');
+        }
+      })();
+      try { await serviceCheck; }
+      catch (error) { serviceCheck = null; throw error; }
+    }
 
     function clearPending(message) {
       for (const p of pending.values()) { clearTimeout(p.timer); p.reject(fail(message)); }
@@ -206,6 +220,7 @@
       if (payload.op === 'stats' || payload.op === 'save') return localRequest(payload);
       if (payload.op === 'create') {
         leave();
+        await ensureServer();
         const code = 'KZH-' + randomHex(3);
         room = new Room(engine, { ...payload, code }); roomCode = code;
         try { await openSocket('host', code); }
@@ -217,6 +232,7 @@
       if (room && payload.code === room.code) return room.handle(payload);
       if (payload.op === 'join') {
         if (room) leave();
+        await ensureServer();
         if (socket) { socket.close(); socket = null; connectionPromise = null; }
         await connectGuest(payload.code);
         return rpc(payload);

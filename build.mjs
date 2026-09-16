@@ -52,6 +52,12 @@ replaceRequired(
 );
 
 replaceRequired(
+  "Install the app before joining so your room seat stays on the same device. Online rooms require ChatGPT sign-in. Rooms expire after 24 hours of inactivity.",
+  "Open this website on each player's device. The host must keep their page open while friends play.",
+  "the outdated online room instructions",
+);
+
+replaceRequired(
   '}var k2=pe(Pt(),1);(0,F2.createRoot)(document.getElementById("root")).render((0,k2.jsx)(Ub,{standalone:!0}));})();',
   '}var KazhuthaRoomClient=window.KazhuthaMultiplayer.createClient({create:R2,play:Tb,resolve:I2,view:Eb,legal:ah,classic:Lc,trump:wb,ai:Rx},D2);var k2=pe(Pt(),1);(0,F2.createRoot)(document.getElementById("root")).render((0,k2.jsx)(Ub,{standalone:!1}));})();',
   "the standalone application startup",

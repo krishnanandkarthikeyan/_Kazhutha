@@ -3,6 +3,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
 const port = Number(process.env.PORT || 3000);
+const allowedOrigins = new Set((process.env.KAZHUTHA_ALLOWED_ORIGINS || '')
+  .split(',').map(value => value.trim()).filter(Boolean));
 const files = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
   ['/index.html', ['index.html', 'text/html; charset=utf-8']],
@@ -18,7 +20,12 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
   if (req.method !== 'GET') { res.writeHead(405); res.end(); return; }
   if (url.pathname === '/health') {
-    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+    const headers = { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' };
+    if (allowedOrigins.has(req.headers.origin)) {
+      headers['Access-Control-Allow-Origin'] = req.headers.origin;
+      headers['Vary'] = 'Origin';
+    }
+    res.writeHead(200, headers);
     res.end('ok');
     return;
   }
@@ -126,7 +133,7 @@ server.on('upgrade', (req, socket, head) => {
   let sameOrigin = true;
   try { sameOrigin = !origin || new URL(origin).host === req.headers.host; }
   catch { sameOrigin = false; }
-  if (!sameOrigin) {
+  if (!sameOrigin && !allowedOrigins.has(origin)) {
     socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
     socket.destroy();
     return;

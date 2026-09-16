@@ -114,16 +114,21 @@
     let connectionPromise = null;
     const pending = new Map();
     const clientTokens = new Map();
-    const endpoint = () => `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`;
+    const onlineOrigin = root.__KAZHUTHA_ONLINE_URL__ || location.origin;
+    const endpoint = () => {
+      const url = new URL('/ws', onlineOrigin);
+      url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+      return url.href;
+    };
     let serviceCheck = null;
 
     async function ensureServer() {
       if (!serviceCheck) serviceCheck = (async () => {
         let response;
-        try { response = await fetch('/health', { cache: 'no-store' }); }
-        catch { throw fail('No multiplayer server is running at this website. Open the Render Web Service URL, not the old Static Site URL.'); }
+        try { response = await fetch(new URL('/health', onlineOrigin), { cache: 'no-store' }); }
+        catch { throw fail('Cannot reach the multiplayer server. Check the Web Service URL and its allowed website origin.'); }
         if (!response.ok || (await response.text()).trim() !== 'ok') {
-          throw fail('No multiplayer server is running at this website. Open the Render Web Service URL, not the old Static Site URL.');
+          throw fail('Cannot reach the multiplayer server. Open the Web Service URL and check /health.');
         }
       })();
       try { await serviceCheck; }

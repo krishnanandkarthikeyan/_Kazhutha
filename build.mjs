@@ -4,6 +4,12 @@ const sourcePath = new URL("./Kazhutha.html", import.meta.url);
 const outputHtml = new URL("./index.html", import.meta.url);
 
 let html = await readFile(sourcePath, "utf8");
+const multiplayerCode = await readFile(new URL("./multiplayer.js", import.meta.url), "utf8");
+if (/<\/script/i.test(multiplayerCode)) throw new Error("Multiplayer source contains an unsafe closing script tag.");
+const onlineURL = (process.env.KAZHUTHA_ONLINE_URL || "").trim().replace(/\/$/, "");
+if (onlineURL && !/^https:\/\/[^/]+$/i.test(onlineURL)) {
+  throw new Error("KAZHUTHA_ONLINE_URL must be an HTTPS origin without a path.");
+}
 
 function replaceRequired(search, replacement, description) {
   if (!html.includes(search)) {
@@ -20,7 +26,7 @@ replaceRequired(
 
 replaceRequired(
   "</style></head>",
-  '</style><script src="./multiplayer.js"></script></head>',
+  `</style><script>globalThis.__KAZHUTHA_ONLINE_URL__=${JSON.stringify(onlineURL)};</script><script>${multiplayerCode}</script></head>`,
   "the closing page styles",
 );
 

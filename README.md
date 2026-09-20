@@ -1,45 +1,37 @@
-# Kazhutha on Render
+# Kazhutha — production HTML/PWA build
 
-This package builds a self-contained `index.html` from the original Kazhutha game and serves it with a Node multiplayer server. The page contains the room client, so no separate JavaScript asset is needed in a website embed. The game still runs in the host's browser, and the server relays messages between players.
+This package keeps the existing Kazhutha HTML/CSS/JavaScript game as the visual source of truth and adds a server-authoritative multiplayer layer for Render.
 
-## Deploy
+## What changed
 
-1. Put every file in this package at the root of a GitHub repository.
-2. In Render, choose **New > Blueprint**.
-3. Connect the repository. Render reads `render.yaml` and creates the **Web Service** called `kazhutha-online`. Confirm that the service type says **Web Service**, with `npm run build` as the build command and `npm start` as the start command. There is no Publish Directory setting on a Web Service.
-4. After the deploy finishes, open the generated `onrender.com` URL.
+- Multiplayer now uses `POST /api/game` on the same Render service instead of host-owned PeerJS rooms.
+- The server owns room state, validates turns and card legality, runs AI turns, protects against stale/double actions, and restores seats with reconnect tokens.
+- The Ace of Spades determines the opening player, but that player may choose **any card** from their hand.
+- **Vettu is disabled for the entire first round.** Off-suit play in round 1 is allowed when a player is void, but it is not treated as Vettu. Normal Vettu logic starts in round 2.
+- PWA manifest, service worker, standalone display mode, landscape preference, safe-area handling, touch protections, and mobile scaling rules were added.
+- The desktop/table composition remains the visual reference; mobile uses the same interface rather than a separate redesign.
 
-If you previously deployed `kazhutha-game.onrender.com` as a Static Site, it will
-continue to show the game but cannot run private rooms. Pushing new files to
-that Static Site does not change its service type. Use the new Web Service URL
-for both the host and every guest. Open `/health` on that URL: it must say `ok`.
+## Render deployment
 
-No environment variables or external multiplayer service are required when players open the new Web Service URL. The bundled `index.html` uses its own website's server by default.
+Push this folder to the repository connected to `https://kazhutha-online.onrender.com/` and deploy using the included `render.yaml`.
 
-## Embed or host the page elsewhere (optional)
+Render should create a **Node web service** with:
 
-To serve the game page from a different site while using the new Web Service for multiplayer, build that site's page with `KAZHUTHA_ONLINE_URL=https://YOUR-WEB-SERVICE.onrender.com npm run build` and publish the resulting root `index.html`. Set `KAZHUTHA_ALLOWED_ORIGINS` on the Web Service to the page's exact origin, such as `https://kazhutha-game.onrender.com`, and redeploy it. For multiple sites, separate exact origins with commas. Both settings are needed: the page uses the configured server for `/health` and WebSocket `/ws`, and the server permits that page's origin. Use the configured server's `/health` address to verify it says `ok`.
+- Build: `npm run build`
+- Start: `npm start`
+- Health check: `/`
 
-This optional setup still requires the Node Web Service. A Static Site alone cannot run private rooms. If you use the Web Service URL directly, leave both settings unset.
+No npm dependencies are required.
 
-## Test locally
-
-Run:
+## Local test
 
 ```bash
 npm run build
-npm start
+PORT=10000 npm start
 ```
 
-Then open <http://localhost:3000>.
+Open `http://localhost:10000`.
 
-The built `index.html`, `multiplayer.js` source, and `server.js` are all at the project root. Keep `render.yaml`, `package.json`, `build.mjs`, and `Kazhutha.html` there too.
+## Important architecture note
 
-## Multiplayer notes
-
-- The host creates a private room and shares the `KZH-XXXXXX` code or invite link.
-- The host's browser owns the live game, so the host must keep the game page open.
-- Each tab keeps its own room seat; opening an invite link in another tab creates a guest seat instead of reusing the host seat. After deploying an update, refresh open game tabs and create a new room.
-- Players need internet access. By default, the room connection is served at the same address as the website.
-- A deployment or service restart closes current rooms. Create a new room afterward.
-- AI, local multiplayer, practice, and browser-saved statistics continue to work.
+Rooms are held in server memory. Brief client disconnects are supported because reconnect tokens restore the player's seat and hand, but a full Render process restart clears active rooms. Persistent cross-restart rooms would require an external store such as Redis/Postgres.

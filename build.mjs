@@ -1,87 +1,100 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 
-const sourcePath = new URL("./Kazhutha.html", import.meta.url);
-const outputHtml = new URL("./index.html", import.meta.url);
-
-let html = await readFile(sourcePath, "utf8");
-const multiplayerCode = await readFile(new URL("./multiplayer.js", import.meta.url), "utf8");
-if (/<\/script/i.test(multiplayerCode)) throw new Error("Multiplayer source contains an unsafe closing script tag.");
-const onlineURL = (process.env.KAZHUTHA_ONLINE_URL || "").trim().replace(/\/$/, "");
-if (onlineURL && !/^https:\/\/[^/]+$/i.test(onlineURL)) {
-  throw new Error("KAZHUTHA_ONLINE_URL must be an HTTPS origin without a path.");
-}
+const sourcePath = new URL('./Kazhutha.html', import.meta.url);
+const outputDir = new URL('./dist/', import.meta.url);
+const outputHtml = new URL('./dist/index.html', import.meta.url);
+let html = await readFile(sourcePath, 'utf8');
 
 function replaceRequired(search, replacement, description) {
-  if (!html.includes(search)) {
-    throw new Error(`Could not prepare the hosted build: ${description} was not found.`);
-  }
+  if (!html.includes(search)) throw new Error(`Build patch failed: ${description}`);
   html = html.replace(search, replacement);
 }
 
-function replaceAllRequired(search, replacement, expected, description) {
-  const occurrences = html.split(search).length - 1;
-  if (occurrences !== expected) throw new Error(`Could not prepare the hosted build: expected ${expected} ${description}, found ${occurrences}.`);
-  html = html.split(search).join(replacement);
-}
+replaceRequired('<title>Kazhutha · കഴുത — Downloaded edition</title>','<title>Kazhutha · കഴുത</title>','title');
 
-// Seats belong to browser tabs. Shared localStorage made an invite opened in a
-// second tab reuse the host token and attempt to claim the host seat remotely.
-replaceAllRequired('xl.get("kazhutha-room")', 'KazhuthaRoomStorage.get()', 2, 'saved-room reads');
-replaceAllRequired('xl.set("kazhutha-room",JSON.stringify(He))', 'KazhuthaRoomStorage.set(JSON.stringify(He))', 1, 'saved-room writes');
+// Opening rule: Ace of Spades decides who opens, but that player may choose ANY card.
 replaceRequired(
-  'Me?.code===Ge.trim().toUpperCase()?{token:Me.token}:{}',
-  'Me?.code===Ge.trim().toUpperCase()&&Me.seat>0?{token:Me.token}:{}',
-  'guest-only seat restoration',
+  'if(t.opening&&t.rules.aceStart)return n.filter(a=>a.id==="S14");',
+  'if(t.opening&&t.rules.aceStart)return n.some(a=>a.id==="S14")?n:[];',
+  'Ace of Spades opening privilege'
+);
+replaceRequired(
+  'lastEvent:{type:"start",text:"The Ace of Spades opens the table."}',
+  'lastEvent:{type:"start",text:"The Ace of Spades holder opens the table and may play any card."}',
+  'opening event text'
 );
 
+// First round: off-suit is allowed when void, but it is NOT a Vettu and cannot end/collect the trick.
 replaceRequired(
-  "<title>Kazhutha · കഴുത — Downloaded edition</title>",
-  "<title>Kazhutha · കഴുത</title>",
-  "the downloadable page title",
+  'let a=structuredClone(t),i=a.hands[e],r=i.splice(i.findIndex(o=>o.id===n),1)[0],s=!!a.leadSuit&&r.suit!==a.leadSuit;if(s&&(a.voids[e].includes(a.leadSuit)||a.voids[e].push(a.leadSuit),a.rules.firstTrump&&!a.trumpSuit&&(a.trumpSuit=r.suit),a.vettuCounts[e]++),',
+  'let a=structuredClone(t),i=a.hands[e],r=i.splice(i.findIndex(o=>o.id===n),1)[0],s=!!a.leadSuit&&r.suit!==a.leadSuit,u=s&&a.round>1;if(s&&(a.voids[e].includes(a.leadSuit)||a.voids[e].push(a.leadSuit)),u&&(a.rules.firstTrump&&!a.trumpSuit&&(a.trumpSuit=r.suit),a.vettuCounts[e]++),',
+  'first-round Vettu detection'
+);
+replaceRequired(
+  'a.trick.push({player:e,card:r,cut:s}),a.history.push({player:e,card:r,cut:s,round:a.round}),a.moves++,a.playedCounts[e]++,a.lastEvent={type:s?"vettu":"play",player:e,text:s?`${a.players[e].name} plays Vettu!`:`${a.players[e].name} plays ${nh(r)}`},s&&a.rules.cutEnds||a.trick.length===a.activePlayers.length)',
+  'a.trick.push({player:e,card:r,cut:u}),a.history.push({player:e,card:r,cut:u,round:a.round}),a.moves++,a.playedCounts[e]++,a.lastEvent={type:u?"vettu":"play",player:e,text:u?`${a.players[e].name} plays Vettu!`:`${a.players[e].name} plays ${nh(r)}`},u&&a.rules.cutEnds||a.trick.length===a.activePlayers.length)',
+  'first-round Vettu resolution'
 );
 
-replaceRequired(
-  "</style></head>",
-  `</style><script>globalThis.__KAZHUTHA_ONLINE_URL__=${JSON.stringify(onlineURL)};</script><script>${multiplayerCode}</script></head>`,
-  "the closing page styles",
+// Written English rules.
+html = html.replace(
+  '"The whole 52-card deck is dealt clockwise. A♠ leads the first trick."',
+  '"The whole 52-card deck is dealt clockwise. The player holding A♠ opens the first trick and may choose any card from their hand."'
+);
+html = html.replace(
+  '"Play any other suit. The trick immediately stops: the player with the highest card of the original suit collects the whole pile, including the cut card. They lead next."',
+  '"Vettu is not allowed in the first round. From round 2 onward, if you cannot follow the led suit, you may play another suit; that off-suit play is Vettu and the normal collection rule applies."'
 );
 
+// Hosted app uses the authoritative /api/game backend already present in the bundle.
 replaceRequired(
-  "function Ub({standalone:t=!1}){let e=t?D2:O2,",
-  "function Ub({standalone:t=!1}){let e=KazhuthaRoomClient.request,",
-  "the downloaded-only request handler",
+  'function Ub({standalone:t=!1}){let e=t?D2:O2,',
+  'function Ub({standalone:t=!1}){let e=O2,',
+  'hosted request handler'
 );
-
 replaceRequired(
   '(0,C.jsx)(Pb,{language:a}),(0,C.jsx)("a",{className:"download-html-button",href:"/downloads/Kazhutha.html",download:"Kazhutha.html",children:"Download HTML \\u2193"})',
-  "null",
-  "the Install app and Download HTML menu options",
+  'null',
+  'download-only menu items'
 );
-
-replaceRequired(
-  "Friends sign in with ChatGPT to use online rooms. The game is free of real-money betting.",
-  "The game is free of real-money betting.",
-  "the sign-in note in the install information",
-);
-
-replaceRequired(
-  "Each friend opens the invite link on their own device, enters a name, and joins. Friends sign in with ChatGPT, then join using your room code.",
-  "Each friend opens the invite link on their own device, enters a name, and joins.",
-  "the ChatGPT sign-in sentence in the room lobby",
-);
-
-replaceRequired(
-  "Install the app before joining so your room seat stays on the same device. Online rooms require ChatGPT sign-in. Rooms expire after 24 hours of inactivity.",
-  "Open this website on each player's device. The host must keep their page open while friends play.",
-  "the outdated online room instructions",
-);
-
+html = html.replace('Friends sign in with ChatGPT to use online rooms. The game is free of real-money betting.','The game is free of real-money betting.');
+html = html.replace('Each friend opens the invite link on their own device, enters a name, and joins. Friends sign in with ChatGPT, then join using your room code.','Each friend opens the invite link on their own device, enters a name, and joins.');
+html = html.replace('Anyone can open the game link. Sign in with ChatGPT to join this room; the invite does not include anyone’s private hand or session.','Anyone with the room code can open the game link and join an available seat; the invite does not include anyone’s private hand or reconnect token.');
 replaceRequired(
   '}var k2=pe(Pt(),1);(0,F2.createRoot)(document.getElementById("root")).render((0,k2.jsx)(Ub,{standalone:!0}));})();',
-  '}var KazhuthaRoomStorage={get:()=>{try{return sessionStorage.getItem("kazhutha-room")}catch{return null}},set:value=>{try{sessionStorage.setItem("kazhutha-room",value)}catch{}}};var KazhuthaRoomClient=window.KazhuthaMultiplayer.createClient({create:R2,play:Tb,resolve:I2,view:Eb,legal:ah,classic:Lc,trump:wb,ai:Rx},D2);var k2=pe(Pt(),1);(0,F2.createRoot)(document.getElementById("root")).render((0,k2.jsx)(Ub,{standalone:!1}));})();',
-  "the standalone application startup",
+  '}var k2=pe(Pt(),1);(0,F2.createRoot)(document.getElementById("root")).render((0,k2.jsx)(Ub,{standalone:!1}));})();',
+  'hosted startup'
 );
 
-await writeFile(outputHtml, html);
+const appCss = `
+/* Production app shell: preserve the desktop composition and scale it rather than redesigning it. */
+html,body,#root{width:100%;height:100%;min-height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:#102d27;}
+html{-webkit-text-size-adjust:100%;touch-action:manipulation;}
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+img,svg{ -webkit-user-drag:none; user-drag:none; }
+button,.playing-card,[role="button"]{touch-action:manipulation;}
+.game-app{width:100vw;height:100dvh;max-width:none!important;overflow:hidden!important;padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);}
+.room-connection{max-width:calc(100vw - 24px);}
+.playing-card{min-width:42px;min-height:58px;}
+@media (max-width:900px),(max-height:560px){
+  .game-app{font-size:clamp(10px,1.45vw,14px);}
+  .playing-screen{transform-origin:50% 50%;}
+  .playing-card{min-width:36px;min-height:50px;}
+  .game-dialog{max-height:calc(100dvh - 20px)!important;overflow:auto!important;}
+  .room-connection{font-size:11px;}
+}
+@media (orientation:portrait) and (max-width:900px){
+  .game-app:before{content:"Rotate your phone for the full table";position:fixed;z-index:99999;inset:0;display:grid;place-items:center;background:#102d27;color:#f2dfad;font:600 18px/1.35 system-ui;text-align:center;padding:32px;}
+}
+@media (prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;}}
+`;
+replaceRequired('</style></head>',`${appCss}</style><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/icon.svg"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><script>if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}))}</script></head>`,'PWA/app styles');
 
-console.log("Kazhutha hosted build created as index.html");
+await mkdir(outputDir,{recursive:true});
+await writeFile(outputHtml,html);
+await Promise.all([
+  copyFile(new URL('./manifest.webmanifest',import.meta.url),new URL('./dist/manifest.webmanifest',import.meta.url)),
+  copyFile(new URL('./icon.svg',import.meta.url),new URL('./dist/icon.svg',import.meta.url)),
+  copyFile(new URL('./sw.js',import.meta.url),new URL('./dist/sw.js',import.meta.url)),
+]);
+console.log('Kazhutha production build created in dist/');

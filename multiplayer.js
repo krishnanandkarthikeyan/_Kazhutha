@@ -1,4 +1,4 @@
-/* Same Kazhutha room engine, with the connection carried by this Render service. */
+/* Kazhutha multiplayer. The host owns the game; guests receive only their own hand. */
 (function (root) {
   'use strict';
   const fail = (message, status = 400) => Object.assign(new Error(message), { status });
@@ -6,8 +6,6 @@
   const validCode = code => typeof code === 'string' && /^KZH-[A-F0-9]{6}$/.test(code);
   const nameOf = name => String(name || 'Player').trim().slice(0, 24) || 'Player';
 
-  // The Room class is copied verbatim from the previously working game client
-  // by build.mjs, so gameplay stays with the host's original browser engine.
   class Room {
     constructor(engine, options, now = Date.now) {
       if (!Number.isInteger(options.count) || options.count < 2 || options.count > 6) throw fail('Choose 2 to 6 players.');
@@ -109,32 +107,30 @@
     }
   }
 
+  function loadPeer() {
+    if (root.Peer) return Promise.resolve(root.Peer);
+    if (loadPeer.pending) return loadPeer.pending;
+    loadPeer.pending = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      const timer = setTimeout(() => finish(fail('The connection service did not respond. Check your internet connection.')), 15000);
+      function finish(error) {
+        clearTimeout(timer);
+        script.onload = script.onerror = null;
+        if (error) { script.remove(); loadPeer.pending = null; reject(error); }
+        else resolve(root.Peer);
+      }
+      script.src = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js';
+      script.onload = () => root.Peer ? finish() : finish(fail('Unable to load multiplayer. Please reload.'));
+      script.onerror = () => finish(fail('Unable to load the connection service. Check your connection and try again.'));
+      document.head.appendChild(script);
+    });
+    return loadPeer.pending;
+  }
+
   function createClient(engine, localRequest) {
-    let socket = null, room = null, roomCode = '', timer = null, serial = 0;
-    let connectionPromise = null;
+    let peer = null, room = null, connection = null, roomCode = '', serial = 0;
+    let opening = null, connecting = null, timer = null;
     const pending = new Map();
-    const clientTokens = new Map();
-    const onlineOrigin = root.__KAZHUTHA_ONLINE_URL__ || location.origin;
-    const endpoint = () => {
-      const url = new URL('/ws', onlineOrigin);
-      url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-      return url.href;
-    };
-    let serviceCheck = null;
-
-    async function ensureServer() {
-      if (!serviceCheck) serviceCheck = (async () => {
-        let response;
-        try { response = await fetch(new URL('/health', onlineOrigin), { cache: 'no-store' }); }
-        catch { throw fail('Cannot reach the multiplayer server. Check the Web Service URL and its allowed website origin.'); }
-        if (!response.ok || (await response.text()).trim() !== 'ok') {
-          throw fail('Cannot reach the multiplayer server. Open the Web Service URL and check /health.');
-        }
-      })();
-      try { await serviceCheck; }
-      catch (error) { serviceCheck = null; throw error; }
-    }
-
     function clearPending(message) {
       for (const p of pending.values()) { clearTimeout(p.timer); p.reject(fail(message)); }
       pending.clear();
@@ -142,115 +138,108 @@
     function leave() {
       clearInterval(timer); timer = null;
       clearPending('You left the room.');
-      if (socket) socket.close();
-      socket = room = null; roomCode = ''; connectionPromise = null;
-      clientTokens.clear();
+      if (connection) connection.close();
+      if (peer) peer.destroy();
+      connection = peer = room = null; roomCode = ''; opening = connecting = null;
     }
-    function onPacket(packet) {
-      if (packet.type === 'response') {
-        const p = pending.get(packet.id);
-        if (!p) return;
-        pending.delete(packet.id); clearTimeout(p.timer);
-        if (packet.error) p.reject(fail(packet.error, packet.status));
-        else p.resolve(packet.response);
-      } else if (packet.type === 'request' && room) {
-        const request = packet.request;
-        const response = { type: 'response', id: packet.id, clientId: packet.clientId };
-        try {
-          if (!request || JSON.stringify(request).length > 2000) throw fail('Invalid request.');
-          const token = clientTokens.get(packet.clientId);
-          if (request.op === 'join') {
-            if (token) throw fail('This connection already has a seat.', 403);
-            if (request.token === room.members[0].token) throw fail('The host seat cannot be joined remotely.', 403);
-          } else if (!token || token !== request.token) throw fail('Join this room first.', 403);
-          response.response = room.handle(request);
-          if (request.op === 'join') clientTokens.set(packet.clientId, response.response.token);
-        } catch (error) {
-          response.error = error.message;
-          response.status = error.status || 400;
-        }
-        if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(response));
-      } else if (packet.type === 'client-left') clientTokens.delete(packet.clientId);
-      else if (packet.type === 'host-left') {
-        clearPending('The host disconnected. Ask them to keep the game page open.');
-        if (socket) socket.close();
-      }
-    }
-    function openSocket(type, code) {
-      return new Promise((resolve, reject) => {
-        const ws = new WebSocket(endpoint());
-        socket = ws;
-        const timeout = setTimeout(() => { ws.close(); reject(fail('Unable to reach the game server. Try again.')); }, 12000);
-        let ready = false;
-        ws.onopen = () => ws.send(JSON.stringify({ type, code }));
-        ws.onmessage = event => {
-          let packet;
-          try { packet = JSON.parse(event.data); } catch { return; }
-          if (!ready) {
-            if (packet.type === 'ready') { ready = true; clearTimeout(timeout); resolve(ws); }
-            else if (packet.type === 'error') { clearTimeout(timeout); ws.close(); reject(fail(packet.error, packet.status)); }
-            return;
-          }
-          onPacket(packet);
-        };
-        ws.onerror = () => { if (!ready) { clearTimeout(timeout); reject(fail('Unable to reach the game server. Try again.')); } };
-        ws.onclose = () => {
-          clearTimeout(timeout);
-          if (!ready) reject(fail('Connection closed. Try again.'));
-          if (socket === ws) { socket = null; connectionPromise = null; clearPending('Disconnected from the room. Reconnecting…'); }
-        };
-      });
-    }
-    async function connectGuest(code, token) {
-      if (socket?.readyState === WebSocket.OPEN && roomCode === code) return;
-      if (connectionPromise) return connectionPromise;
-      connectionPromise = (async () => {
-        if (socket) socket.close();
-        roomCode = code;
-        await openSocket('join', code);
-        if (token) await rpc({ op: 'join', code, token });
+    async function openPeer(id) {
+      if (peer && !peer.destroyed && peer.open) return peer;
+      if (opening) return opening;
+      opening = (async () => {
+        const Peer = await loadPeer();
+        return new Promise((resolve, reject) => {
+          const p = new Peer(id, { debug: 0 });
+          peer = p;
+          const timeout = setTimeout(() => { p.destroy(); reject(fail('Could not reach the room service. Try another network.')); }, 15000);
+          p.on('open', () => { clearTimeout(timeout); resolve(p); });
+          p.on('error', error => {
+            clearTimeout(timeout);
+            const message = error.type === 'peer-unavailable' ? 'Room not found. Check the code and ask the host to keep the game open.' : 'Room connection failed. Check your internet connection and try again.';
+            reject(fail(message, error.type === 'peer-unavailable' ? 404 : 400));
+            clearPending(message);
+          });
+          p.on('disconnected', () => { if (!p.destroyed) { try { p.reconnect(); } catch (_) {} } });
+          p.on('connection', conn => {
+            if (!room) { conn.close(); return; }
+            let boundToken = null;
+            let messages = 0, windowStart = Date.now();
+            conn.on('data', packet => {
+              if (!room || !packet || typeof packet.id !== 'string' || packet.id.length > 80) return;
+              if (Date.now() - windowStart > 1000) { messages = 0; windowStart = Date.now(); }
+              if (++messages > 20) { conn.close(); return; }
+              try {
+                const request = packet.request;
+                if (!request || JSON.stringify(request).length > 2000) throw fail('Invalid request.');
+                if (request.op !== 'join' && (!boundToken || request.token !== boundToken)) throw fail('Join this room first.', 403);
+                if (request.op === 'join' && boundToken) throw fail('This connection already has a seat.', 403);
+                if (request.op === 'join' && request.token === room.members[0].token) throw fail('The host seat cannot be joined remotely.', 403);
+                const response = room.handle(request);
+                if (request.op === 'join') boundToken = response.token;
+                conn.send({ id: packet.id, response });
+              } catch (error) { conn.send({ id: packet.id, error: error.message, status: error.status || 400 }); }
+            });
+            conn.on('error', () => {});
+          });
+        });
       })();
-      try { await connectionPromise; } finally { connectionPromise = null; }
+      try { return await opening; } finally { opening = null; }
+    }
+    async function connect(code) {
+      if (connection && connection.open && roomCode === code) return;
+      if (connecting) return connecting;
+      connecting = (async () => {
+        const p = await openPeer();
+        if (connection) connection.close();
+        roomCode = code;
+        await new Promise((resolve, reject) => {
+          const conn = p.connect('kazhutha-table-v1-' + code, { reliable: true, serialization: 'json' });
+          connection = conn;
+          const timeout = setTimeout(() => { conn.close(); reject(fail('Could not connect to the host. Ask them to keep the game open, or try another network.')); }, 18000);
+          conn.on('open', () => { clearTimeout(timeout); resolve(); });
+          conn.on('data', packet => {
+            const q = packet && pending.get(packet.id);
+            if (!q) return;
+            pending.delete(packet.id); clearTimeout(q.timer);
+            if (packet.error) q.reject(fail(packet.error, packet.status)); else q.resolve(packet.response);
+          });
+          conn.on('close', () => { clearTimeout(timeout); reject(fail('The host connection closed.')); if (connection === conn) clearPending('Disconnected from the host. Keep this page open to reconnect.'); });
+          conn.on('error', () => { clearTimeout(timeout); reject(fail('Could not connect to the host.')); });
+        });
+      })();
+      try { return await connecting; } finally { connecting = null; }
     }
     function rpc(request) {
       return new Promise((resolve, reject) => {
-        if (socket?.readyState !== WebSocket.OPEN) return reject(fail('The room is disconnected.'));
+        if (!connection || !connection.open) { reject(fail('The host is disconnected.')); return; }
         const id = String(++serial);
         const timer = setTimeout(() => { pending.delete(id); reject(fail('The host did not respond. Check your connection.')); }, 12000);
         pending.set(id, { resolve, reject, timer });
-        socket.send(JSON.stringify({ type: 'request', id, request }));
+        try { connection.send({ id, request }); } catch (error) { clearTimeout(timer); pending.delete(id); reject(error); }
       });
     }
     async function request(payload) {
       if (payload.op === 'stats' || payload.op === 'save') return localRequest(payload);
       if (payload.op === 'create') {
         leave();
-        await ensureServer();
         const code = 'KZH-' + randomHex(3);
         room = new Room(engine, { ...payload, code }); roomCode = code;
-        try { await openSocket('host', code); }
+        try { await openPeer('kazhutha-table-v1-' + code); }
         catch (error) { leave(); throw error; }
-        timer = setInterval(() => { if (room) try { room.tick(); } catch (error) { console.error('Room update failed:', error); } }, 200);
+        timer = setInterval(() => room && room.tick(), 200);
         return room.snapshot(room.members[0], true);
       }
       if (!validCode(payload.code)) throw fail('Enter a room code such as KZH-A1B2C3.');
       if (room && payload.code === room.code) return room.handle(payload);
       if (payload.op === 'join') {
         if (room) leave();
-        await ensureServer();
-        if (socket) { socket.close(); socket = null; connectionPromise = null; }
-        await connectGuest(payload.code);
-        try { return await rpc(payload); }
-        catch (error) {
-          // Older builds stored a host token in shared localStorage. An invite
-          // opened in another tab must get its own guest seat instead.
-          if (payload.token && error.status === 403 && error.message === 'The host seat cannot be joined remotely.') {
-            return rpc({ ...payload, token: undefined });
-          }
-          throw error;
-        }
+        // A fresh transport needs to establish its seat before any other action.
+        if (connection) { connection.close(); connection = null; }
+        await connect(payload.code);
+        return rpc(payload);
       }
-      await connectGuest(payload.code, payload.token);
+      const reconnecting = !connection || !connection.open;
+      await connect(payload.code);
+      if (reconnecting) await rpc({ op: 'join', code: payload.code, token: payload.token });
       return rpc(payload);
     }
     return { request, leave };

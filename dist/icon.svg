@@ -1,1 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="92" fill="#173d33"/><circle cx="256" cy="260" r="172" fill="#d9b76d"/><path d="M170 152l35-82 47 75M342 152l-35-82-47 75" fill="#c89b51" stroke="#3a2a1c" stroke-width="18" stroke-linejoin="round"/><path d="M173 205c24-51 142-51 166 0v117c0 61-166 61-166 0z" fill="#c89b51" stroke="#3a2a1c" stroke-width="18"/><circle cx="217" cy="251" r="12"/><circle cx="295" cy="251" r="12"/><path d="M219 315q37 28 74 0" fill="none" stroke="#3a2a1c" stroke-width="14" stroke-linecap="round"/><path d="M236 285h40" stroke="#3a2a1c" stroke-width="11" stroke-linecap="round"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="92" fill="#133930"/>
+  <rect x="42" y="42" width="428" height="428" rx="92" fill="#184a3e" stroke="#d8b36a" stroke-width="6"/>
+  <g transform="translate(256 266)">
+    <rect x="-148" y="-142" width="220" height="292" rx="24" fill="#ead9a8" stroke="#c79c4f" stroke-width="9" transform="rotate(-14)"/>
+    <rect x="-72" y="-142" width="220" height="292" rx="24" fill="#f0e1b7" stroke="#c79c4f" stroke-width="9" transform="rotate(14)"/>
+    <rect x="-110" y="-154" width="220" height="308" rx="24" fill="#fff5d9" stroke="#d8b36a" stroke-width="10"/>
+    <text x="-78" y="-100" font-family="Arial, sans-serif" font-size="52" font-weight="700" fill="#173b32">A</text>
+    <text x="0" y="32" text-anchor="middle" font-family="Arial, sans-serif" font-size="148" fill="#173b32">♠</text>
+  </g>
+  <circle cx="405" cy="395" r="11" fill="#d8b36a"/>
+  <circle cx="448" cy="362" r="11" fill="#d8b36a"/>
+  <path d="M399 375c13-18 29-29 48-29" fill="none" stroke="#d8b36a" stroke-width="9" stroke-linecap="round"/>
+</svg>

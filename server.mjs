@@ -13,7 +13,7 @@ const trump = {...classic,name:'Trump-on-First-Vettu',firstTrump:true,cutEnds:fa
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
 const hex=n=>randomBytes(n).toString('hex').toUpperCase();
 const validCode=c=>typeof c==='string'&&/^KZH-[A-F0-9]{6}$/.test(c);
-const cleanName=n=>(String(n||'Player').trim().slice(0,24)||'Player');
+const cleanName=n=>{const value=String(n??'').trim().slice(0,24);if(!value)throw fail('Enter your name to continue.');return value};
 const deck=()=>SUITS.flatMap(s=>Array.from({length:13},(_,i)=>({id:`${s}${i+2}`,rank:i+2,suit:s})));
 const clone=x=>structuredClone(x);
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=randomInt(i+1);[a[i],a[j]]=[a[j],a[i]]}return a}
@@ -31,9 +31,153 @@ if((cut&&a.rules.cutEnds)||a.trick.length===a.activePlayers.length){const w=winn
 function resolve(g){if(!g.result)throw fail('The trick is not complete.');const a=clone(g),r=a.result,last=a.trick.at(-1).player;if(r.collector!==null){a.hands[r.collector].push(...r.cards);a.known[r.collector].push(...r.cards);a.voids[r.collector]=a.voids[r.collector].filter(s=>!r.cards.some(c=>c.suit===s))}else a.discarded.push(...r.cards);const safe=a.activePlayers.filter(i=>!a.hands[i].length);a.safePlayers.push(...safe);a.activePlayers=a.activePlayers.filter(i=>a.hands[i].length);a.lastEvent={type:r.collector!==null?'collect':'clear',player:r.collector??r.winner,safe,text:r.collector!==null?`${a.players[r.collector].name} collects ${r.cards.length} cards.`:`${a.players[r.winner].name} takes the lead. The pile is out.`};a.trick=[];a.leadSuit=null;a.result=null;a.round++;if(a.activePlayers.length===1){a.loser=a.activePlayers[0];a.status='finished';a.currentPlayer=a.loser;a.lastEvent={type:'finish',player:a.loser,text:`${a.players[a.loser].name} is the Kazhutha!`};return a}let n=a.rules.winnerLeads?(r.collector??r.winner):nextActive(a,last);if(!a.activePlayers.includes(n))n=nextActive(a,n);a.currentPlayer=n;a.leader=n;const key=a.hands.map(h=>h.map(c=>c.id).sort().join(',')).join('|')+`:${n}:${a.trumpSuit}`;a.repetitions[key]=(a.repetitions[key]||0)+1;if(a.repetitions[key]>=3||a.moves>=12000){a.status='stalemate';a.lastEvent={type:'stalemate',text:'The same position repeated. Redeal to keep the game moving; no loss is recorded.'}}return a}
 function view(g,seat){return{id:g.id,players:g.players.map(p=>({id:p.id,name:p.name,type:p.type})),hand:clone(g.hands[seat]),counts:g.hands.map(h=>h.length),currentPlayer:g.currentPlayer,activePlayers:[...g.activePlayers],safePlayers:[...g.safePlayers],rules:{...g.rules},trick:clone(g.trick),leadSuit:g.leadSuit,trumpSuit:g.trumpSuit,discarded:clone(g.discarded),voids:clone(g.voids),known:clone(g.known),opening:g.opening,round:g.round,moves:g.moves,status:g.status,loser:g.loser,result:clone(g.result),lastEvent:clone(g.lastEvent),playedCounts:[...g.playedCounts],vettuCounts:[...g.vettuCounts],viewer:seat}}
 function ai(g,seat,difficulty='Medium'){const v=view(g,seat),moves=legal(g,seat);if(!moves.length)throw fail('No legal moves.');if(difficulty==='Easy')return moves[randomInt(moves.length)];const counts=Object.fromEntries(SUITS.map(s=>[s,v.hand.filter(c=>c.suit===s).length]));const opponents=v.activePlayers.filter(i=>i!==seat);const score=c=>{let s=0;if(v.leadSuit){if(c.suit!==v.leadSuit){s-=c.rank; if(v.round===1)s+=8; else s+=counts[c.suit]*1.5;}else{const current=winner([...v.trick,{player:seat,card:c}],v.leadSuit,v.trumpSuit,v.rules);s+=current.player===seat?c.rank*.7:-c.rank;}}else{const voidThreat=opponents.filter(i=>v.voids[i].includes(c.suit)).length;s+=c.rank*(voidThreat?2.8:.4)-counts[c.suit];}if(difficulty==='Hard'||difficulty==='Expert'){const threat=Math.min(...opponents.map(i=>v.counts[i]));const near=opponents.filter(i=>v.counts[i]===threat).length;s+=near&&c.rank<7?-3:0;s+=opponents.filter(i=>v.voids[i].includes(c.suit)).length*2; s+=(Math.random()-.5)*.35;}else s+=(Math.random()-.5)*1.5;return s};return [...moves].sort((a,b)=>score(a)-score(b))[0]}
-class Room{constructor(req){if(!Number.isInteger(req.count)||req.count<2||req.count>6)throw fail('Choose 2 to 6 players.');this.code='KZH-'+hex(3);this.rules=req.rules==='trump'?trump:classic;this.difficulty=['Easy','Medium','Hard','Expert'].includes(req.difficulty)?req.difficulty:'Medium';this.seats=Array.from({length:req.count},(_,i)=>({name:i? 'Open seat':cleanName(req.name),type:i?'open':'human'}));this.members=[{token:hex(24),seat:0,lastSeen:Date.now()}];this.game=null;this.chat=[];this.nextStep=0;this.lastTouch=Date.now()}member(token){const m=this.members.find(x=>x.token===token);if(!m)throw fail('Your seat is no longer available. Join the room again.',403);return m}snapshot(m,withToken=false){return{code:this.code,seat:m.seat,...(withToken?{token:m.token}:{}),lobby:{seats:this.seats.map(s=>({...s}))},chat:this.chat.map(x=>({...x})),game:this.game?view(this.game,m.seat):null}}join(req){let m=req.token&&this.members.find(x=>x.token===req.token);if(!m){if(this.game)throw fail('This game has already started. Reconnect with your saved room token.',409);const nm=cleanName(req.name);if(this.seats.some(s=>s.type==='human'&&s.name.toLowerCase()===nm.toLowerCase()))throw fail('That player name is already in this room.',409);const seat=this.seats.findIndex(s=>s.type==='open');if(seat<0)throw fail('This room is full.',409);m={token:hex(24),seat,lastSeen:Date.now()};this.members.push(m);this.seats[seat]={name:nm,type:'human'}}m.lastSeen=Date.now();this.lastTouch=Date.now();return this.snapshot(m,true)}tick(){if(!this.game||this.game.status!=='playing'||Date.now()<this.nextStep)return;if(this.game.result){this.game=resolve(this.game);this.nextStep=Date.now()+900;return}const p=this.game.players[this.game.currentPlayer];if(p.type==='ai'){const c=ai(this.game,this.game.currentPlayer,this.difficulty);this.game=play(this.game,this.game.currentPlayer,c.id);this.nextStep=Date.now()+(this.game.result?1200:650)}}handle(req){if(req.op==='join')return this.join(req);const m=this.member(req.token);m.lastSeen=Date.now();this.lastTouch=Date.now();this.tick();switch(req.op){case'poll':break;case'start':case'rematch':if(m.seat!==0)throw fail('Only the host can start a round.',403);if(this.game&&this.game.status==='playing')throw fail('Finish the current round first.',409);this.seats=this.seats.map((s,i)=>s.type==='open'?{name:`AI ${i+1}`,type:'ai'}:s);this.game=createGame(this.seats,this.rules);this.nextStep=Date.now()+800;break;case'play':if(!this.game||this.game.id!==req.expectedGameId||this.game.moves!==req.expectedMoves)throw fail('The table changed. Check your hand and play again.',409);this.game=play(this.game,m.seat,req.card);this.nextStep=Date.now()+(this.game.result?1200:650);break;case'chat':{const text=String(req.text||'').trim().slice(0,180);if(!text)throw fail('Enter a message.');if(m.lastChat&&Date.now()-m.lastChat<700)throw fail('Please wait a moment before sending another message.',429);m.lastChat=Date.now();this.chat.push({id:hex(8),seat:m.seat,name:this.seats[m.seat].name,text,time:Date.now()});this.chat=this.chat.slice(-60);break}case'replace':if(m.seat!==0)throw fail('Only the host can replace a disconnected player.',403);if(!Number.isInteger(req.seat)||req.seat<=0||req.seat>=this.seats.length)throw fail('Invalid seat.');{const guest=this.members.find(x=>x.seat===req.seat);if(guest&&Date.now()-guest.lastSeen<30000)throw fail('This player is still connected. Wait 30 seconds after they disconnect.');this.members=this.members.filter(x=>x.seat!==req.seat);this.seats[req.seat]={name:this.seats[req.seat].name+' (AI)',type:'ai'};if(this.game)this.game.players[req.seat]={...this.game.players[req.seat],...this.seats[req.seat]}}break;default:throw fail('Unknown room action.')}this.tick();return this.snapshot(m)}}
-function handleGame(req){if(!req||typeof req.op!=='string')throw fail('Invalid request.');if(req.op==='create'){const room=new Room(req);rooms.set(room.code,room);return room.snapshot(room.members[0],true)}if(req.op==='stats')return{results:savedResults.slice(-500)};if(req.op==='save'){if(req.result?.id&&!savedResults.some(r=>r.id===req.result.id))savedResults.push({...req.result,date:Date.now()});return{ok:true}}if(!validCode(req.code))throw fail('Enter a room code such as KZH-A1B2C3.');const room=rooms.get(req.code);if(!room)throw fail('Room not found. Ask the host to create a new room.',404);return room.handle(req)}
+class Room {
+  constructor(req) {
+    if (!Number.isInteger(req.count) || req.count < 2 || req.count > 6) throw fail('Choose 2 to 6 players.');
+    this.code = 'KZH-' + hex(3);
+    this.rules = req.rules === 'trump' ? trump : classic;
+    this.difficulty = ['Easy','Medium','Hard','Expert'].includes(req.difficulty) ? req.difficulty : 'Medium';
+    const hostName = cleanName(req.name);
+    this.seats = Array.from({length:req.count}, (_,i) => ({name:i ? 'Open seat' : hostName, type:i ? 'open' : 'human'}));
+    this.members = [{token:hex(24), seat:0, lastSeen:Date.now()}];
+    this.game = null;
+    this.chat = [];
+    this.nextStep = 0;
+    this.lastTouch = Date.now();
+  }
+  member(token) {
+    const m = this.members.find(x => x.token === token);
+    if (!m) throw fail('Your seat is no longer available. Join the room again.',403);
+    return m;
+  }
+  snapshot(m, withToken=false) {
+    return {code:this.code, seat:m.seat, ...(withToken?{token:m.token}:{}), lobby:{seats:this.seats.map(s=>({...s}))}, chat:this.chat.map(x=>({...x})), game:this.game?view(this.game,m.seat):null};
+  }
+  join(req) {
+    let m = req.token && this.members.find(x => x.token === req.token);
+    if (!m) {
+      if (this.game) throw fail('This game has already started. Reconnect with your saved room token.',409);
+      const nm = cleanName(req.name);
+      if (this.seats.some(s => s.type === 'human' && s.name.toLowerCase() === nm.toLowerCase())) throw fail('That player name is already in this room.',409);
+      const seat = this.seats.findIndex(s => s.type === 'open');
+      if (seat < 0) throw fail('This room is full.',409);
+      m = {token:hex(24), seat, lastSeen:Date.now()};
+      this.members.push(m);
+      this.seats[seat] = {name:nm, type:'human'};
+    }
+    m.lastSeen = Date.now();
+    this.lastTouch = Date.now();
+    return this.snapshot(m,true);
+  }
+  leave(req) {
+    const m = this.member(req.token);
+    const seat = m.seat;
+    this.members = this.members.filter(x => x.token !== m.token);
+    this.lastTouch = Date.now();
+    if (seat === 0) return {ok:true, closeRoom:true};
+    if (this.game && this.game.status === 'playing') {
+      const oldName = this.seats[seat]?.name || `Player ${seat+1}`;
+      this.seats[seat] = {name:`${oldName} (AI)`, type:'ai'};
+      this.game.players[seat] = {...this.game.players[seat], ...this.seats[seat]};
+      if (this.game.currentPlayer === seat) this.nextStep = Date.now() + 250;
+    } else {
+      this.seats[seat] = {name:'Open seat', type:'open'};
+    }
+    return {ok:true, closeRoom:false};
+  }
+  tick() {
+    if (!this.game || this.game.status !== 'playing' || Date.now() < this.nextStep) return;
+    if (this.game.result) {
+      this.game = resolve(this.game);
+      this.nextStep = Date.now() + 900;
+      return;
+    }
+    const p = this.game.players[this.game.currentPlayer];
+    if (p.type === 'ai') {
+      const c = ai(this.game,this.game.currentPlayer,this.difficulty);
+      this.game = play(this.game,this.game.currentPlayer,c.id);
+      this.nextStep = Date.now() + (this.game.result ? 1200 : 650);
+    }
+  }
+  handle(req) {
+    if (req.op === 'join') return this.join(req);
+    if (req.op === 'leave') return this.leave(req);
+    const m = this.member(req.token);
+    m.lastSeen = Date.now();
+    this.lastTouch = Date.now();
+    this.tick();
+    switch(req.op) {
+      case 'poll': break;
+      case 'start':
+      case 'rematch':
+        if (m.seat !== 0) throw fail('Only the host can start a round.',403);
+        if (this.game && this.game.status === 'playing') throw fail('Finish the current round first.',409);
+        this.seats = this.seats.map((s,i) => s.type === 'open' ? {name:`AI ${i+1}`,type:'ai'} : s);
+        this.game = createGame(this.seats,this.rules);
+        this.nextStep = Date.now() + 800;
+        break;
+      case 'play':
+        if (!this.game || this.game.id !== req.expectedGameId || this.game.moves !== req.expectedMoves) throw fail('The table changed. Check your hand and play again.',409);
+        this.game = play(this.game,m.seat,req.card);
+        this.nextStep = Date.now() + (this.game.result ? 1200 : 650);
+        break;
+      case 'chat': { 
+        const text = String(req.text||'').trim().slice(0,180);
+        if (!text) throw fail('Enter a message.');
+        if (m.lastChat && Date.now()-m.lastChat < 700) throw fail('Please wait a moment before sending another message.',429);
+        m.lastChat = Date.now();
+        this.chat.push({id:hex(8),seat:m.seat,name:this.seats[m.seat].name,text,time:Date.now()});
+        this.chat = this.chat.slice(-60);
+        break;
+      }
+      case 'replace': {
+        if (m.seat !== 0) throw fail('Only the host can replace a disconnected player.',403);
+        if (!Number.isInteger(req.seat) || req.seat <= 0 || req.seat >= this.seats.length) throw fail('Invalid seat.');
+        const guest = this.members.find(x => x.seat === req.seat);
+        if (guest && Date.now()-guest.lastSeen < 30000) throw fail('This player is still connected. Wait 30 seconds after they disconnect.');
+        this.members = this.members.filter(x => x.seat !== req.seat);
+        this.seats[req.seat] = {name:this.seats[req.seat].name+' (AI)',type:'ai'};
+        if (this.game) this.game.players[req.seat] = {...this.game.players[req.seat],...this.seats[req.seat]};
+        break;
+      }
+      default: throw fail('Unknown room action.');
+    }
+    this.tick();
+    return this.snapshot(m);
+  }
+}
+function handleGame(req){
+  if(!req||typeof req.op!=='string')throw fail('Invalid request.');
+  if(req.op==='create'){const room=new Room(req);rooms.set(room.code,room);return room.snapshot(room.members[0],true)}
+  if(req.op==='stats')return{results:savedResults.slice(-500)};
+  if(req.op==='save'){if(req.result?.id&&!savedResults.some(r=>r.id===req.result.id))savedResults.push({...req.result,date:Date.now()});return{ok:true}}
+  if(!validCode(req.code))throw fail('Enter a room code such as KZH-A1B2C3.');
+  const room=rooms.get(req.code);if(!room)throw fail('Room not found. Ask the host to create a new room.',404);
+  const out=room.handle(req);
+  if(req.op==='leave'&&out?.closeRoom){rooms.delete(req.code);return{ok:true,closed:true}}
+  return out;
+}
 setInterval(()=>{const now=Date.now();for(const [code,r] of rooms){r.tick();if(now-r.lastTouch>6*60*60*1000)rooms.delete(code)}},200).unref();
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.ico':'image/x-icon','.css':'text/css; charset=utf-8'};
-const server=http.createServer(async(req,res)=>{try{if(req.method==='POST'&&req.url==='/api/game'){let body='';for await(const ch of req){body+=ch;if(body.length>10000)throw fail('Request too large.',413)}const out=handleGame(JSON.parse(body||'{}'));res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'});res.end(JSON.stringify(out));return}if(req.method!=='GET'&&req.method!=='HEAD'){res.writeHead(405);res.end();return}let pathname=new URL(req.url,'http://localhost').pathname;if(pathname==='/')pathname='/index.html';const safe=normalize(pathname).replace(/^([.][.][/\\])+/, '').replace(/^[/\\]+/,'');let file=join(DIST,safe);try{const st=await stat(file);if(st.isDirectory())file=join(file,'index.html')}catch{file=join(DIST,'index.html')}const data=await readFile(file);res.writeHead(200,{'content-type':mime[extname(file)]||'application/octet-stream','x-content-type-options':'nosniff','referrer-policy':'strict-origin-when-cross-origin'});if(req.method==='HEAD')res.end();else res.end(data)}catch(e){const status=e.status||500;res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify({error:status===500?'Server error. Please retry.':e.message}))}});
+const corsHeaders={
+  'access-control-allow-origin':'*',
+  'access-control-allow-methods':'GET,HEAD,POST,OPTIONS',
+  'access-control-allow-headers':'Content-Type',
+  'access-control-max-age':'86400'
+};
+const server=http.createServer(async(req,res)=>{try{
+  if(req.method==='OPTIONS'){
+    res.writeHead(204,{...corsHeaders,'cache-control':'no-store'});res.end();return;
+  }
+  if(req.method==='POST'&&req.url==='/api/game'){
+    let body='';for await(const ch of req){body+=ch;if(body.length>10000)throw fail('Request too large.',413)}
+    const out=handleGame(JSON.parse(body||'{}'));
+    res.writeHead(200,{...corsHeaders,'content-type':'application/json','cache-control':'no-store'});res.end(JSON.stringify(out));return;
+  }
+  if(req.method!=='GET'&&req.method!=='HEAD'){res.writeHead(405,{...corsHeaders});res.end();return}
+  let pathname=new URL(req.url,'http://localhost').pathname;if(pathname==='/')pathname='/index.html';
+  const safe=normalize(pathname).replace(/^([.][.][/\\])+/, '').replace(/^[/\\]+/,'');let file=join(DIST,safe);
+  try{const st=await stat(file);if(st.isDirectory())file=join(file,'index.html')}catch{file=join(DIST,'index.html')}
+  const data=await readFile(file);res.writeHead(200,{...corsHeaders,'content-type':mime[extname(file)]||'application/octet-stream','x-content-type-options':'nosniff','referrer-policy':'strict-origin-when-cross-origin'});if(req.method==='HEAD')res.end();else res.end(data)
+}catch(e){const status=e.status||500;res.writeHead(status,{...corsHeaders,'content-type':'application/json','cache-control':'no-store'});res.end(JSON.stringify({error:status===500?'Server error. Please retry.':e.message}))}});
 server.listen(PORT,()=>console.log(`Kazhutha server listening on ${PORT}`));

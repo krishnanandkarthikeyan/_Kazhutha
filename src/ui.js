@@ -171,6 +171,13 @@ function Ub({
                     pt && xe("The table changed. Check your hand and play again.");
                     return
                 }
+                if ([401,403,404].includes(He.status)) {
+                    xl.set("kazhutha-room", ""); go.current=null;
+                    Ze(null); ye(null); P(null); l("menu");
+                    c("Private online room"); s("setup");
+                    xe("Your saved room session is no longer available. Create a room or enter a room code to join again.");
+                    return;
+                }
                 os("reconnecting"), (pt || He.status === 401 || He.status === 403 || He.status === 404) && xe(He.message)
             }
         }, U === "poll").finally(() => {

@@ -9,9 +9,9 @@
    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);
    try{
      const response=await fetch(BASE+'/api/game',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'omit',cache:'no-store',signal:controller.signal,body:JSON.stringify(payload)});
-     if(!response.headers.get('content-type')?.includes('application/json'))throw Object.assign(Error('Unable to connect to the game server. Tap Retry.'),{status:502});
+     if(!response.headers.get('content-type')?.includes('application/json'))throw Object.assign(Error('The online room service is unavailable (HTTP '+response.status+'). Please try again later.'),{status:502,httpStatus:response.status});
      const out=await response.json();if(!response.ok)throw Object.assign(Error(out.error||'Unable to connect to the game server.'),{status:response.status});return out;
-   }catch(e){if(e.status)throw e;throw Object.assign(Error('Unable to connect to the game server. Tap Retry.'),{status:0});}
+   }catch(e){if(e.status)throw e;throw Object.assign(Error(e.name==='AbortError'?'The game server took too long to respond. Tap Retry.':'Unable to reach the game server. Check your internet connection, then tap Retry.'),{status:0});}
    finally{clearTimeout(timer);}
  }
  function request(payload){

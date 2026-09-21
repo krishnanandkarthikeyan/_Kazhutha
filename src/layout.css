@@ -1,36 +1,18 @@
-html,body,#root{margin:0!important;width:100%;height:100%;min-height:0;overflow:hidden!important;overscroll-behavior:none;background:#102d27;}
-body{-webkit-user-select:none;user-select:none;-webkit-text-size-adjust:100%;touch-action:manipulation;}
-input,textarea{user-select:text;} img,svg{-webkit-user-drag:none;}button{touch-action:manipulation;}
-#root{position:fixed;inset:0;}
-.game-app{position:absolute!important;min-height:0!important;transform-origin:top left!important;overflow:hidden!important;}
+/* Preserve original styling; portalled dialogs fit independently. */
+body{-webkit-text-size-adjust:100%;}
+.game-app{transform:none!important;}
+.game-dialog{
+ position:fixed!important;left:var(--dialog-left,0px)!important;top:var(--dialog-top,0px)!important;
+ right:auto!important;bottom:auto!important;margin:0!important;
+ translate:none!important;rotate:none!important;scale:none!important;
+ transform:scale(var(--dialog-scale,1))!important;transform-origin:top left!important;
+ width:590px!important;max-width:none!important;max-height:none!important;
+ box-sizing:border-box!important;overflow:visible!important;
+ animation:none!important;transition:none!important;visibility:var(--dialog-visible,hidden);
+}
+.game-dialog[data-kind=setup]{width:660px!important;}
+.game-dialog .name-prompt{color:#f1cf8a;font-size:13px;margin:0;}
+.game-dialog[data-kind=rules] .rulebook,.game-dialog[data-kind=statistics] .statistics{max-height:430px;overflow-y:auto;overscroll-behavior:contain;}
 .exit-game-button{color:#eed7a7;border:1px solid #cbb07888;border-radius:6px;padding:8px 12px;font-size:13px;min-height:40px;}
 .playing-card.selected{outline:3px solid #e7c172;outline-offset:3px;}
-.game-dialog{position:fixed!important;left:var(--dialog-x,50%)!important;top:var(--dialog-y,50%)!important;translate:none!important;transform:translate(-50%,-50%) scale(var(--dialog-scale,1))!important;transform-origin:center!important;max-width:none!important;max-height:none!important;width:590px!important;overflow:visible!important;display:flex!important;flex-direction:column;gap:10px!important;padding:22px!important;animation:none!important;}
-.game-dialog .dialog-heading{flex:none;font-size:25px!important;}
-.game-dialog .dialog-description{flex:none;margin:0!important;font-size:13px!important;}
-.game-dialog input{font-size:16px!important;}
-.game-dialog .name-prompt{color:#f1cf8a;font-size:13px;margin:0;}
-.game-dialog .setup-body,.game-dialog .settings-body{gap:12px;}
-.game-dialog .number-picker>button{padding:7px 5px;font-size:21px;}
-.game-dialog .number-picker small{margin-top:3px;}
-.game-dialog .mode-options>button{padding:9px;}
-.game-dialog .names-grid input{padding:7px;}
-.game-dialog .gold-button{min-height:42px;}
-.game-dialog[data-kind=rules] .rulebook,.game-dialog[data-kind=statistics] .statistics{max-height:var(--content-height,430px);overflow-y:auto;overscroll-behavior:contain;padding-right:6px;}
-.game-dialog .dialog-close{flex:none;}
-.game-dialog[data-kind=rules] .rulebook>.gold-button{position:sticky;bottom:0;flex-shrink:0;}
-.game-dialog[data-kind=setup]{width:690px!important;}
-.game-dialog[data-kind=setup] .setup-body{display:grid;grid-template-columns:1fr 1fr;gap:12px 18px;align-items:start;}
-.game-dialog[data-kind=setup] .name-prompt,.game-dialog[data-kind=setup] .names-grid,.game-dialog[data-kind=setup] .online-setup,.game-dialog[data-kind=setup] .custom-rules,.game-dialog[data-kind=setup] .setup-body>.gold-button,.game-dialog[data-kind=setup] .setup-body>.muted{grid-column:1/-1;}
-.game-dialog[data-kind=setup] .mode-options{gap:5px;}
-.game-dialog[data-kind=setup] .mode-options>button{font-size:12px;padding:7px;gap:5px;}
-.game-dialog[data-kind=setup] .mode-options small{display:none;}
-.game-dialog[data-kind=setup] .number-picker small{display:none;}
-.game-dialog[data-kind=setup] .two-fields{grid-column:1/-1;}
-.game-dialog .settings-body{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;}
-.game-dialog .settings-body>.two-fields,.game-dialog .settings-body>.muted,.game-dialog .settings-body>.subtle-button{grid-column:1/-1;}
-.game-dialog .settings-body .volume-row{margin:10px 0;}
-.error-toast{z-index:1000!important;max-width:calc(100vw - 24px)!important;position:fixed!important;left:50%!important;bottom:12px!important;transform:translateX(-50%)!important;font-size:13px!important;}
-.lobby-panel{max-height:none!important;top:14%!important;}
-.lobby-panel .lobby-seats{margin:10px 0;}
-@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important;}}
+.error-toast{z-index:1000!important;}

@@ -1,22 +1,27 @@
-# Validation — Kazhutha 3.0.0
+# Kazhutha 3.0.1 repair validation
 
-## Passed
+## Changes
 
-- JavaScript syntax checks and HTML assembly.
-- Six engine/server test groups: Ace holder free choice; first-round Vettu suppression in Classic and Trump modes; required names; redacted views; legal AI moves through complete games; 52-card conservation; valid known-card/void deductions; idempotent create/join/start/play; reconnect; intentional exit and host transfer; state serialization; void inference after collecting a pile.
-- Isolated frontend DOM integration against the new HTTP server: two clients, blank-name rejection, create, join, game start, individual hand controls, Exit confirmation, server leave and host transfer. Tests also cover reload resume and temporary disconnection.
-- HTTP contract checks against the updated local server: blank name returns 400; create/join/start produces a shared 26/26 deal; leaving transfers host controls.
-- Live Render API check with two disposable test players: create, join, start, matching game IDs/card counts, correct names and same-seat token polling. Test players were sent leave requests afterward.
-- Android Java/resource compilation; APK signature verification (v2/v3); version code 30 / version name 3.0.0; API 24 minimum / target 35; original icons; landscape manifest; APK HTML matches downloadable HTML exactly.
+- Restored the original supplied CSS exactly, including its responsive rules. Removed the 3.0.0 setup grid redesign and changed main-screen scaling back to the original CSS zoom implementation.
+- Dialogs render in the viewport independently of the scaled game. Their measured width/height determine pixel coordinates and a uniform scale. Individual CSS translation/scale and animations are reset to avoid conflicting transforms. Resize, content changes, font loading and the keyboard trigger recalculation. Missing safe-area values default to zero.
+- Invalid or expired saved room sessions return to room setup instead of reconnecting indefinitely. Temporary network errors retain the session.
+- Non-JSON server errors show their HTTP status; connection failures and timeouts have distinct messages.
 
-## Not yet verified / not performed
+## Passed in this repair
 
-- The new backend has **not been deployed** to Render. The live API did not expose the new protocol's revision field during the check; a successful live connection does not prove that the new server rules are deployed.
-- Rendered visual QA of the edited files is incomplete: local Chrome was blocked by environment socket restrictions, and the cloud browser rejected local-file navigation under its URL policy. No attempt was made to bypass either restriction.
-- Phone dialog centering, touch target sizes, 3D hand appearance, safe areas, audio and animation need a rendered browser/physical Android check. No physical-device or emulator APK run was available.
-- Multiplayer was checked using independent API/DOM clients, not multiple physical devices or independent rendered-browser sessions.
-- The APK is development-key signed. Signing was verified, not installation on a device or Play Store readiness.
+- Exact comparison: original base CSS preserved byte-for-byte.
+- Eight Node tests: six engine/server groups plus centering across five viewport/content combinations and HTTP 405 error handling.
+- Two isolated frontend DOM clients against the bundled HTTP backend: required names, create/join/start, separate hands, reload resume, offline recovery, exit, host transfer and expired-session recovery. No unexpected JavaScript errors. Canvas/audio APIs are mocked; this does not validate rendered graphics.
+- Android compilation and v2/v3 signature verification; version code 31 / version 3.0.1. Bundled HTML equals downloadable HTML.
 
-## Deployment smoke check
+## Still unverified or blocked
 
-After deploying, check `/api/health` for version 3.0.0 / protocol 3. Use two devices with the new HTML/APK to create and join a room, confirm names and separate hands, start, play a full game, temporarily disconnect one device, reconnect, then use Exit. Confirm first-round off-suit cards do not collect the pile and the Ace holder can open a non-Ace card. Inspect phone dialogs in landscape and with the keyboard open.
+- Render deployment has not been performed; account/repository deployment access is unavailable. Opening the HTML or installing the APK does not update the server.
+- A live room-creation probe received HTTP 405. A follow-up request was prevented by automatic approval review because the session reached a usage limit. The exact cause of the live rejection is not confirmed.
+- No rendered-browser, emulator or physical-phone visual verification of this repair. Local browser launch and cloud local-file navigation were previously blocked. Centering tests validate calculations, not browser layout or touch readability.
+
+## Deploy and check
+
+Deploy the package contents to the existing Render Node Web Service using build command `npm run build` and start command `npm start`. The health URL `/api/health` should return JSON with version `3.0.1` and protocol `3`, not an HTML page. If it is configured as a static site, the POST room API cannot run there.
+
+On two devices, create and join a room, check names and separate hands, play a turn, temporarily disconnect/reconnect, and exit. Inspect Play with friends, Settings and Rules on a landscape phone, including with the keyboard open. See README.md for persistence and single-instance requirements.

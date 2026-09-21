@@ -16,7 +16,7 @@ export function createApp({dataDir=null}={}){
     const json=(status,body)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(body));};
     if(req.method==='OPTIONS'){res.writeHead(204);res.end();return;}
     const path=new URL(req.url,'http://localhost').pathname;
-    if(path==='/api/health'){json(200,{ok:true,version:'3.0.0',protocol:3});return;}
+    if(path==='/api/health'){json(200,{ok:true,version:'3.0.1',protocol:3});return;}
     if(path==='/api/game'){
       if(req.method!=='POST'){json(405,{error:'Use POST.'});return;}
       try{

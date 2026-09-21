@@ -1,4 +1,4 @@
-# Kazhutha 3.0.1
+# Kazhutha 3.0.2
 
 This is the updated Node backend and the existing game's HTML renderer. The original room graphics, cards and icon are retained. All clients use https://kazhutha-online.onrender.com/api/game.
 
@@ -14,7 +14,7 @@ npm run test:ui
 npm start
 ```
 
-The server listens on PORT (3000 by default). `/api/health` reports protocol 3 and version 3.0.1. The deployable HTML is `dist/index.html`; `Kazhutha.html` is an identical downloadable copy.
+The server listens on PORT (3000 by default). `/api/health` reports protocol 3 and version 3.0.2. The deployable HTML is `dist/index.html`; `Kazhutha.html` is an identical downloadable copy.
 
 ## Update the existing Render service
 
@@ -42,3 +42,5 @@ Readable source is in `src/`: `engine.js`, `ai.js`, `rooms.js`, `network.js`, `u
 `test/engine.test.js` tests rules, state conservation, fair AI, idempotency, reconnects, exit and persistence. `test/frontend.cjs` exercises two isolated DOM clients through the actual HTTP endpoint, including name validation, room flow, reload, disconnection and exit. It substitutes canvas/audio APIs and is **not a rendered-browser or physical-device test**.
 
 See `VALIDATION.md` for checks performed and remaining limitations.
+
+See DEPLOYMENT-FIX.md for compatibility with earlier Render startup and health settings.

@@ -25,3 +25,6 @@
 Deploy the package contents to the existing Render Node Web Service using build command `npm run build` and start command `npm start`. The health URL `/api/health` should return JSON with version `3.0.1` and protocol `3`, not an HTML page. If it is configured as a static site, the POST room API cannot run there.
 
 On two devices, create and join a room, check names and separate hands, play a turn, temporarily disconnect/reconnect, and exit. Inspect Play with friends, Settings and Rules on a landscape phone, including with the keyboard open. See README.md for persistence and single-instance requirements.
+
+## Backend-only 3.0.2 repair
+Both server.js and server.mjs pass subprocess startup tests for /health, /api/health and two-player create/join. See DEPLOYMENT-FIX.md. The 3.0.1 client and visual limitations remain unchanged.

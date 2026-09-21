@@ -16,7 +16,7 @@ export function createApp({dataDir=null}={}){
     const json=(status,body)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(body));};
     if(req.method==='OPTIONS'){res.writeHead(204);res.end();return;}
     const path=new URL(req.url,'http://localhost').pathname;
-    if(path==='/api/health'){json(200,{ok:true,version:'3.0.1',protocol:3});return;}
+    if(path==='/api/health'||path==='/health'){json(200,{ok:true,version:'3.0.2',protocol:3});return;}
     if(path==='/api/game'){
       if(req.method!=='POST'){json(405,{error:'Use POST.'});return;}
       try{
@@ -39,7 +39,9 @@ export function createApp({dataDir=null}={}){
   const timer=setInterval(()=>{try{if(service.tick())save();for(const [key,v] of rates)if(Date.now()-v.at>60000)rates.delete(key);}catch(e){console.error('Room tick failed:',e.message)}},200);timer.unref();
   server.on('close',()=>{clearInterval(timer);save();});return {server,service};
 }
-if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
-  const {server}=createApp({dataDir:process.env.DATA_DIR||'./data'});server.listen(Number(process.env.PORT)||3000,'0.0.0.0',()=>console.log('Kazhutha 3.0 listening'));
+export function startServer(){
+  const {server}=createApp({dataDir:process.env.DATA_DIR||'./data'});server.listen(Number(process.env.PORT)||3000,'0.0.0.0',()=>console.log('Kazhutha 3.0.2 listening; room API: /api/game'));
   for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>server.close(()=>process.exit(0)));
+  return server;
 }
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))startServer();

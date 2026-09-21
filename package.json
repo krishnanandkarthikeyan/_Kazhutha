@@ -1,18 +1,13 @@
 {
   "name": "kazhutha-render",
-  "version": "3.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "start": "node server.mjs",
-    "test": "node --test test/*.test.js",
-    "test:ui": "node test/frontend.cjs"
+    "start": "node server.js"
   },
   "engines": {
-    "node": ">=22"
-  },
-  "devDependencies": {
-    "jsdom": "30.1.0"
+    "node": ">=20"
   }
 }
